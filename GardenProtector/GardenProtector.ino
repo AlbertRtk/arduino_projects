@@ -6,14 +6,15 @@
  *  - Relay NO 
  *  - Solenoid valve NC
  *  - 2 LEDs
- *  - 2 buttons
+ *  - 1 button
+ *  - 1 switch
  */
 
 const int alarmBtnPin = 2;
-const int valveBtnPin = 3;
+const int valveBtnPin = 3;  // switch that holds state
 const int pirPin = 4;  // motion detector
-const int alarmLedPin = 8;
-const int valveLedPin = 9;
+const int alarmLedPin = 8;  // on if alarm can be on, blinks if alarm is on, off if alarm cannot be on 
+const int valveLedPin = 9;  // on if valve is open
 const int valvePin = 10;  // solenoid valve / electrovalve, normally close
 
 byte alarmState = LOW;
@@ -52,7 +53,7 @@ void setup() {
 void loop() {
   // read button to acivate alarm
   byte alarmBtnState = digitalRead(alarmBtnPin);
-  if (alarmBtnState != lastAlarmBtnState) {
+  if (alarmBtnState != lastAlarmBtnState && (HIGH == valveManualState || HIGH == alarmState)) {
     lastAlarmBtnState = alarmBtnState;
     if (LOW == alarmBtnState) {
       alarmState = (HIGH == alarmState) ? LOW : HIGH;
@@ -61,13 +62,11 @@ void loop() {
     }
   }
 
-  // read button to open valve manually 
-  byte valveBtnState = digitalRead(valveBtnPin);
-  if (valveBtnState != lastValveBtnState) {
-    lastValveBtnState = valveBtnState;
-    if (LOW == valveBtnState) {
-      valveManualState = (HIGH == valveManualState) ? LOW : HIGH;
-    }
+  // read switch to open valve manually (switch holds state) 
+  valveManualState = !digitalRead(valveBtnPin);
+  if (LOW == valveManualState && HIGH == alarmState) {
+    // if alarm is active and valve was opened - cancel alarm
+    alarmState = LOW;
   }
 
   if (HIGH == alarmState) {
@@ -91,7 +90,7 @@ void loop() {
       digitalWrite(valvePin, valveState);  // close switch = open valve 
     }
     
-    if (millisNow - alarmStart >= alarmDuration || HIGH == valveManualState) {
+    if (millisNow - alarmStart >= alarmDuration) {
       // alarm should finish or vale manually closed
       valveState = HIGH;
       digitalWrite(valveLedPin, !valveState);
@@ -104,9 +103,9 @@ void loop() {
     }
   }
   else {
-    // alarm deactivated, LED is on (no blink) to indicate that the device is ready to be used
-    digitalWrite(alarmLedPin, HIGH);
-    digitalWrite(valveLedPin, !valveManualState);
-    digitalWrite(valvePin, valveManualState);
+    // alarm deactivated
+    digitalWrite(alarmLedPin, valveManualState);  // alarm can be activated only when valve is close
+    digitalWrite(valveLedPin, !valveManualState);  // valve close on LOW switch
+    digitalWrite(valvePin, valveManualState);  // valve close on LOW switch
   }
 }
